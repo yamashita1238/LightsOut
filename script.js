@@ -28,7 +28,7 @@ class Panel {
     onMouseOver(panel) {
 	return () => {
 	    panel.board.onMouseOverAPanel(panel.row, panel.col);
-	}
+	};
     }
 }
 
@@ -44,7 +44,7 @@ class Board {
     reconstruct() {
 	this.panels  = [];
 	while (this.element.firstChild) {
-	    this.element.removeChild(this.element.firstChild)
+	    this.element.removeChild(this.element.firstChild);
 	}
 	for (let row = 0; row < this.height; row++) {
 	    this.panels[row] = [];
