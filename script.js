@@ -1,33 +1,35 @@
-let gameLevel = 3;
-
 class Panel {
-    constructor(isOn, board, tableRowElement, row, col) {
-	this.isOn = isOn;
-	this.board = board;
-	this.row = row;
-	this.col = col;
-	this.panelElement = tableRowElement.insertCell(-1);
-	this.panelElement.className = 'panel';
-	this.panelElement.setAttribute('isOn', false);
-	this.panelElement.setAttribute('selected', false);
-	this.panelElement.addEventListener('click', this.onClick(this));
-	this.panelElement.addEventListener('mouseover', this.onMouseOver(this));
+    constructor(board, tableRowElement, row, col) {
+	this.isOn    = false;
+	this.board   = board;
+	this.row     = row;
+	this.col     = col;
+	this.element = tableRowElement.insertCell(-1);
+	this.element.className = 'panel';
+	this.element.setAttribute('isOn', false);
+	this.element.setAttribute('selected', false);
+	this.element.addEventListener('click', this.onClick(this));
+	this.element.addEventListener('mouseover', this.onMouseOver(this));
+    }
+
+    turnLight(b) {
+	this.isOn = b;
+	this.element.setAttribute('isOn', b);
     }
 
     toggleLight() {
-	this.isOn = !this.isOn;
-	this.panelElement.setAttribute('isOn', this.isOn);
+	this.turnLight(!this.isOn);
     }
 
     onClick(panel) {
 	return () => {
-	    panel.board.onClickPanel(panel.row, panel.col);
+	    panel.board.onClickPanel(panel);
 	};
     }
 
     onMouseOver(panel) {
 	return () => {
-	    panel.board.onMouseOverAPanel(panel.row, panel.col);
+	    panel.board.onMouseOverAPanel(panel);
 	};
     }
 }
@@ -40,7 +42,7 @@ class Board {
 	this.reconstruct();
 	this.randomize();
     }
-
+    
     reconstruct() {
 	this.panels  = [];
 	while (this.element.firstChild) {
@@ -49,57 +51,48 @@ class Board {
 	for (let row = 0; row < this.height; row++) {
 	    this.panels[row] = [];
 	    let rowElement = this.element.insertRow(row);
-	    rowElement.id = 'row' + row.toString();
 	    for (let col = 0; col < this.width; col++) {
 		this.panels[row][col] =
-		    new Panel(false, this, rowElement, row, col);
+		    new Panel(this, rowElement, row, col);
 	    }
 	}
+    }
+
+    enumAllPanels() {
+	return this.panels.reduce((row, listOfPanels) =>
+				  row.concat(listOfPanels), []);
+    }
+
+    enumSelectedPanels(centerPanel) {
+	return this.enumAllPanels().filter(panel => isNeighbor(panel, centerPanel));
     }
     
-    onClickPanel(clickRow, clickCol) {
-	this.toggleFivePanels(clickRow, clickCol);
+    onClickPanel(clickedPanel) {
+	this.toggleSelectedPanels(clickedPanel);
 	if (this.checkClear()) {
-	    setTimeout(showClearMessage, 1);
+	    setTimeout(clearHandling, 1);
 	}
     }
 
-    onMouseOverAPanel(mouseRow, mouseCol) {
-	for (let row = 0; row < this.height; row++) {
-	    for (let col = 0; col < this.width; col++) {
-		board.panels[row][col].panelElement
-		     .setAttribute('selected', isNeighbor(row, col, mouseRow, mouseCol));
-	    }
-	}
+    onMouseOverAPanel(mousePanel) {
+	this.enumAllPanels().forEach(
+	    panel => panel.element.setAttribute('selected', isNeighbor(panel, mousePanel)));
     }
 
-    toggleFivePanels(centerRow, centerCol) {
-	for (let row = 0; row < this.height; row++) {
-	    for (let col = 0; col < this.width; col++) {
-		if (isNeighbor(row, col, centerRow, centerCol)) {
-		    this.panels[row][col].toggleLight();
-		}
-	    }
-	}
+    toggleSelectedPanels(centerPanel) {
+	this.enumSelectedPanels(centerPanel).forEach(panel => panel.toggleLight());
     }
     
     turnOffAll() {
-	for (let row = 0; row < this.height; row++) {
-	    for (let col = 0; col < this.width; col++) {
-		let panel = this.panels[row][col];
-		if (panel.isOn) {
-		    panel.toggleLight();
-		}		    
-	    }
-	}
+	this.enumAllPanels().forEach(panel => panel.turnLight(false));
     }
 
     randomize() {
 	this.turnOffAll();
-	for (let i = 0; i < gameLevel; i++) {
+	for (let i = 0; i < levelSettingBox.getValue(); i++) {
 	    let row = Math.floor(Math.random() * this.height);
 	    let col = Math.floor(Math.random() * this.width);
-	    this.toggleFivePanels(row, col);
+	    this.toggleSelectedPanels(this.panels[row][col]);
 	}
 	if (this.checkClear()) {
 	    this.randomize();
@@ -107,27 +100,25 @@ class Board {
     }
 
     checkClear() {
-	for (let row = 0; row < this.height; row++) {
-	    for (let col = 0; col < this.width; col++) {
-		if (this.panels[row][col].isOn) {
-		    return false;
-		}
-	    }
-	}
-	return true;
+	let clear = true;
+	this.enumAllPanels().forEach(
+	    panel => { if (panel.isOn) clear = false; });
+	return clear;
     }
 }
 
-function isNeighbor(row1, col1, row2, col2) {
-    return Math.abs(row1 - row2) + Math.abs(col1 - col2) <= 1;
+function isNeighbor(panel1, panel2) {
+    return Math.abs(panel1.row - panel2.row) + Math.abs(panel1.col - panel2.col) <= 1;
 }
 
-function showClearMessage() {
+function clearHandling() {
     window.alert('クリア！！');
+    levelSettingBox.setValue(levelSettingBox.getValue() + 1);
+    board.randomize();
+    
 }
 
 function onLevelInput() {
-    gameLevel = document.getElementById('levelSettingBox').value;
     board.randomize();
 }
 
@@ -138,15 +129,25 @@ function onSizeInput() {
     board.randomize();
 }
 
-const levelSettingBox  = document.getElementById('levelSettingBox');
-levelSettingBox.setAttribute('value', gameLevel);
-levelSettingBox.addEventListener('input', onLevelInput);
+class SettingBox {
+    constructor(elementId, defaultValue, inputListener) {
+	this.element = document.getElementById(elementId);
+	this.element.setAttribute('value', defaultValue);
+	this.element.addEventListener('input', inputListener);
+    }
 
-const heightSettingBox = document.getElementById('heightSettingBox');
-heightSettingBox.addEventListener('input', onSizeInput);
+    getValue() {
+	return Number(this.element.value);
+    }
 
-const widthSettingBox  = document.getElementById('widthSettingBox');
-widthSettingBox.addEventListener('input', onSizeInput);
+    setValue(x) {
+	this.element.value = x;
+    }
+}
 
-let board = new Board(heightSettingBox.value, widthSettingBox.value);
+const levelSettingBox  = new SettingBox('levelSettingBox' , 1, onLevelInput);
+const heightSettingBox = new SettingBox('heightSettingBox', 5, onSizeInput);
+const widthSettingBox  = new SettingBox('widthSettingBox' , 5, onSizeInput);
+
+const board = new Board(heightSettingBox.getValue(), widthSettingBox.getValue());
 
